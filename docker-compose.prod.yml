@@ -1,0 +1,8 @@
+services:
+  web:
+    image: ${DOCKER_USERNAME}/telegram-chat-web:latest
+    environment:
+      PORT: "4002"
+    ports:
+      - "4002:4002"
+    restart: unless-stopped

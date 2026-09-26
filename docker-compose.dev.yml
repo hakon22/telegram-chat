@@ -1,0 +1,13 @@
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+      args:
+        VITE_GREEN_API_URL: https://4100.api.green-api.com
+        VITE_BASE_PATH: /telegram-chat/
+    image: telegram-chat-web-dev:latest
+    environment:
+      PORT: "4002"
+    ports:
+      - "4002:4002"

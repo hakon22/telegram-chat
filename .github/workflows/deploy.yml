@@ -1,0 +1,134 @@
+name: Deploy to VPS [telegram-chat]
+
+on:
+  push:
+    branches:
+      - production
+  workflow_dispatch:
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      frontend: ${{ steps.set.outputs.frontend }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Detect changed paths
+        uses: dorny/paths-filter@v3
+        id: filter
+        if: github.event_name == 'push'
+        with:
+          filters: |
+            frontend:
+              - 'web/**'
+              - 'shared/**'
+              - 'Dockerfile.web'
+              - 'package.json'
+              - 'package-lock.json'
+              - 'docker-compose.prod.yml'
+              - '.github/workflows/deploy.yml'
+
+      - name: Set pipeline flags
+        id: set
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "frontend=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "frontend=${{ steps.filter.outputs.frontend }}" >> "$GITHUB_OUTPUT"
+          fi
+
+  frontend_test:
+    needs: [changes]
+    if: needs.changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck and build
+        run: npm run build
+        env:
+          VITE_GREEN_API_URL: https://4100.api.green-api.com
+          VITE_BASE_PATH: /telegram-chat/
+
+  frontend_build:
+    needs: [changes, frontend_test]
+    if: needs.changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    environment: production
+    concurrency:
+      group: ${{ github.workflow }}-frontend-${{ github.ref }}
+      cancel-in-progress: true
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_TOKEN }}
+
+      - name: Build and push Web image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile.web
+          platforms: linux/amd64
+          push: true
+          tags: ${{ secrets.DOCKER_USERNAME }}/telegram-chat-web:latest
+          build-args: |
+            VITE_GREEN_API_URL=https://4100.api.green-api.com
+            VITE_BASE_PATH=/telegram-chat/
+
+  frontend_deploy:
+    needs: [changes, frontend_build]
+    if: needs.changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Copy compose file to server
+        uses: appleboy/scp-action@v0.1.3
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.TELEGRAM_CHAT_SSH_PRIVATE_KEY }}
+          source: "docker-compose.prod.yml"
+          target: "/var/www/portfolio.am-projects.ru/telegram-chat/"
+
+      - name: Deploy frontend to server
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.TELEGRAM_CHAT_SSH_PRIVATE_KEY }}
+          script: |
+            set -e
+            cd /var/www/portfolio.am-projects.ru/telegram-chat/
+            echo "${{ secrets.DOCKER_TOKEN }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+            docker pull ${{ secrets.DOCKER_USERNAME }}/telegram-chat-web:latest
+            export DOCKER_USERNAME='${{ secrets.DOCKER_USERNAME }}'
+            docker compose -f docker-compose.prod.yml up -d web
+            docker image prune -f

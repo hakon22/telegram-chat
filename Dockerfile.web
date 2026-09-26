@@ -1,0 +1,39 @@
+# Собранная статика. Nginx на сервере свой.
+FROM node:22-alpine AS deps
+WORKDIR /app
+COPY package*.json ./
+COPY shared/package.json ./shared/
+COPY web/package.json ./web/
+RUN npm ci
+
+FROM node:22-alpine AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+
+ARG VITE_GREEN_API_URL=https://4100.api.green-api.com
+ARG VITE_BASE_PATH=/telegram-chat/
+
+ENV VITE_GREEN_API_URL=$VITE_GREEN_API_URL
+ENV VITE_BASE_PATH=$VITE_BASE_PATH
+
+RUN npm run build -w @telegram-chat/web
+
+FROM node:22-alpine AS app
+WORKDIR /app
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/package.json ./
+COPY --from=builder /app/shared/package.json ./shared/package.json
+COPY --from=builder /app/shared/lib ./shared/lib
+COPY --from=builder /app/web/package.json ./web/package.json
+COPY --from=builder /app/web/vite.config.ts ./web/vite.config.ts
+COPY --from=builder /app/web/vite ./web/vite
+COPY --from=builder /app/web/dist ./web/dist
+
+ARG VITE_BASE_PATH=/telegram-chat/
+ENV VITE_BASE_PATH=$VITE_BASE_PATH
+ENV PORT=4002
+
+EXPOSE 4002
+ENTRYPOINT ["npm", "run"]
+CMD ["start:web:prod"]

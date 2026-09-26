@@ -1,0 +1,74 @@
+@use 'variables' as *;
+
+@mixin mobile {
+  @media (max-width: $breakpoint-mobile) {
+    @content;
+  }
+}
+
+@mixin thin-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 0, 0, 0.25) transparent;
+
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.22);
+    border-radius: 6px;
+  }
+}
+
+@mixin bubble-tail($color, $side) {
+  overflow: visible;
+
+  @if $side == end {
+    border-bottom-right-radius: 0 !important;
+  } @else {
+    border-bottom-left-radius: 0 !important;
+  }
+
+  &::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    width: 8px;
+    height: 13px;
+    background: $color;
+    box-shadow: 1px 1px 1px rgba(16, 35, 47, 0.06);
+
+    @if $side == end {
+      right: -8px;
+      border-bottom-left-radius: 0;
+      clip-path: polygon(0 0, 0 100%, 100% 100%);
+    } @else {
+      left: -8px;
+      clip-path: polygon(100% 0, 0 100%, 100% 100%);
+    }
+  }
+}
+
+@mixin fade-in {
+  animation: app-fade 160ms ease;
+}
+
+/** iOS Safari: font-size < 16px на focus вызывает auto-zoom */
+@mixin ios-no-input-zoom {
+  input,
+  textarea,
+  select,
+  .ant-input,
+  .ant-input-affix-wrapper,
+  .ant-input-affix-wrapper input,
+  .ant-input-affix-wrapper textarea,
+  .ant-input-number,
+  .ant-input-number-input,
+  .ant-select-selector,
+  .ant-select-selection-search-input,
+  .ant-sender-input textarea,
+  .ant-sender-input input,
+  .ant-sender-input [contenteditable='true'] {
+    font-size: $font-size-input-mobile-min !important;
+  }
+}

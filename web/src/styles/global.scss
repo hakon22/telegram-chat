@@ -1,0 +1,70 @@
+@use 'variables' as *;
+@use 'mixins' as *;
+
+@keyframes app-fade {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+html,
+body,
+#root,
+.ant-app {
+  margin: 0;
+  height: 100%;
+  min-height: 100dvh;
+  background: $color-wallpaper;
+  color: $color-text;
+  font-family: $font-family;
+  font-size: $font-size-message;
+  line-height: $line-height-message;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+button,
+input,
+textarea {
+  font-family: inherit;
+}
+
+@include mobile {
+  @include ios-no-input-zoom;
+}
+
+@media (hover: none) and (pointer: coarse) {
+  @include ios-no-input-zoom;
+}
+
+.boot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  background: $color-primary;
+  @include fade-in;
+}
+
+.app-spinner {
+  color: $color-primary;
+
+  &_page {
+    font-size: 36px;
+    color: #ffffff;
+  }
+
+  &_button {
+    font-size: 16px;
+  }
+
+  &_meta {
+    font-size: 12px;
+    color: $color-meta;
+  }
+}
